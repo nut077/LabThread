@@ -1,5 +1,6 @@
 package labthread.freedomseven.com.labthread.fragment;
 
+import android.content.Context;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -8,6 +9,10 @@ import android.os.Looper;
 import android.os.Message;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.AsyncTaskLoader;
+import android.support.v4.content.Loader;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,7 +21,7 @@ import labthread.freedomseven.com.labthread.R;
 import labthread.freedomseven.com.labthread.databinding.FragmentMainBinding;
 
 
-public class MainFragment extends Fragment {
+public class MainFragment extends Fragment implements LoaderManager.LoaderCallbacks<Object> {
 
     FragmentMainBinding binding;
     private int counter;
@@ -27,7 +32,8 @@ public class MainFragment extends Fragment {
     HandlerThread backgroundHandlerThread;
     Handler backgroundHandler;
     Handler mainHandler;
-    SampleSsyncTAsk sampleSsyncTAsk;
+    SampleAsyncTask sampleAsyncTask;
+    final static int ID_ASYNCTASKLOADER = 1;
 
     public MainFragment() {
         super();
@@ -165,8 +171,11 @@ public class MainFragment extends Fragment {
         */
 
         // --- thread 5 ---
-        sampleSsyncTAsk = new SampleSsyncTAsk();
-        sampleSsyncTAsk.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, 0, 100);
+        //sampleAsyncTask = new SampleAsyncTask();
+        //sampleAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, 0, 100);
+
+        // --- thread 6 ---
+        getLoaderManager().initLoader(ID_ASYNCTASKLOADER, null, this);
 
     }
 
@@ -186,13 +195,36 @@ public class MainFragment extends Fragment {
         super.onDestroy();
         //thread.interrupt();
         //backgroundHandlerThread.quit();
-        sampleSsyncTAsk.cancel(true);
+        //sampleAsyncTask.cancel(true);
     }
 
-    class SampleSsyncTAsk extends AsyncTask<Integer, Float, Boolean> {
+    @Override
+    public Loader<Object> onCreateLoader(int id, Bundle args) {
+        if (id == ID_ASYNCTASKLOADER) {
+            return new AdderAsyncTaskLoader(getContext(), 5, 11);
+        }
+        return null;
+    }
+
+    @Override
+    public void onLoadFinished(Loader<Object> loader, Object data) {
+        Log.d("LLLL", "onLoadFinished");
+        if (loader.getId() == ID_ASYNCTASKLOADER) {
+            Integer result = (Integer) data;
+            binding.tvCounter.setText(String.valueOf(result));
+        }
+    }
+
+    @Override
+    public void onLoaderReset(Loader<Object> loader) {
+
+    }
+
+    class SampleAsyncTask extends AsyncTask<Integer, Float, Boolean> {
 
         @Override
         protected Boolean doInBackground(Integer... params) {
+            // Background Thread
             int start = params[0]; // 0
             int end = params[1];   // 100
             for (int i = start; i < end; i++) {
@@ -203,7 +235,7 @@ public class MainFragment extends Fragment {
                 }
                 publishProgress(i + 0.0f);
             }
-            return null;
+            return true;
         }
 
         @Override
@@ -219,6 +251,45 @@ public class MainFragment extends Fragment {
             // Run on Main Thread
             super.onPostExecute(aBoolean);
 
+        }
+    }
+
+    static class AdderAsyncTaskLoader extends AsyncTaskLoader<Object> {
+        int num1, num2;
+        Integer result;
+        public AdderAsyncTaskLoader(Context context, int num1, int num2) {
+            super(context);
+            this.num1 = num1;
+            this.num2 = num2;
+        }
+
+        @Override
+        public Integer loadInBackground() {
+            // Background Thread
+            Log.d("LLLL", "loadInBackground");
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            result = num1 + num2;
+            return result;
+        }
+
+        @Override
+        protected void onStartLoading() {
+            super.onStartLoading();
+            Log.d("LLLL", "onStartLoading");
+            if (result != null) {
+                deliverResult(result);
+            }
+            forceLoad();
+        }
+
+        @Override
+        protected void onStopLoading() {
+            super.onStopLoading();
+            Log.d("LLLL", "onStopLoading");
         }
     }
 }
